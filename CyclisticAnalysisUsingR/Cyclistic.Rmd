@@ -1,0 +1,270 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+---
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+---
+title: "Cyclistic Bike-Share"
+author: "Anushka James"
+output: html_notebook
+final---
+
+----
+# Introduction
+
+This is a data analysis project for the Cyclistic Bike-share case study. The main aim of the analysis is to find patterns/trends between casual riders and the annual members.
+
+The data analysis process that I followed here to answer the business question 'How do annual members and casual riders use Cyclistic bikes differently?' is Ask, Prepare, Process, Analyze, Share, and Act.
+
+# Install Necessary libraries
+```{r}
+install.packages("tidyverse")
+library(tidyverse)
+```
+# Get the data ready for analysis
+
+Data used here is from a online datasource of a Bike sharing company 'Motive Inc' who operates the Divvy Bike-Share service in Chicago.The 12 files contains historical trip data for each month of the year 2021.
+```{r}
+data01<-read_csv("~/Project/202101-divvy-tripdata.csv")
+data02<-read_csv("~/Project/202102-divvy-tripdata.csv")
+data03<-read_csv("~/Project/202103-divvy-tripdata.csv")
+data04<-read_csv("~/Project/202104-divvy-tripdata.csv")
+data05<-read_csv("~/Project/202105-divvy-tripdata.csv")
+data06<-read_csv("~/Project/202106-divvy-tripdata.csv")
+data07<-read_csv("~/Project/202107-divvy-tripdata.csv")
+data08<-read_csv("~/Project/202108-divvy-tripdata.csv")
+data09<-read_csv("~/Project/202109-divvy-tripdata.csv")
+data10<-read_csv("~/Project/202110-divvy-tripdata.csv")
+data11<-read_csv("~/Project/202111-divvy-tripdata.csv")
+data12<-read_csv("~/Project/202112-divvy-tripdata.csv")
+```
+## Exploring Data
+
+Explored the data in Excel first and added some quick calculated columns to the dataset like ride_length,	day_of_the_week, and	Number_of_days.
+
+```{r}
+finaldf<-rbind(data01,data02,data03,data04,data05,data06,data07,data08,data09,data10,data11,data12)
+```
+
+Removing the column unnecessary for analysis.
+
+```{r}
+finaldf<-subset(finaldf,select=-c(start_station_empty,end_station_empty))
+```
+
+```{r}
+head(finaldf)
+glimpse(finaldf)
+```
+
+The columns 'Started_at' and 'ended_at' are stored as characters instead of datetime. So converting them into datetime.
+```{r}
+finaldf$started_at<-strptime(as.character(finaldf$started_at),"%m/%d/%Y %H:%M")
+finaldf$ended_at<-strptime(finaldf$ended_at,"%m/%d/%Y %H:%M")
+```
+
+Extracting hour.month from the started_at column for later analysis.
+```{r}
+library(lubridate)
+finaldf$start_hour_of_the_day<-hour(finaldf$started_at)
+finaldf$month<-month(finaldf$started_at)
+finaldf$min_ride_length<-minute(finaldf$ride_length)
+```
+```{r}
+head(finaldf)
+```
+## Process data
+Checking if the end time is before the start time.
+```{r}
+finaldf%>%filter(started_at>ended_at)
+```
+It shows that in some records the ended_at time is lesser than the started_at time and the ride length for them is mentinoned as NA. These records are wrong as the end time can't be less than the start time.
+
+Dropping such records.
+```{r}
+finaldf<-finaldf[!is.na(finaldf$ride_length),]
+```
+
+```{r}
+head(finaldf)
+```
+ride_id is a primary key and it should not contaion any duplicate or null values. Let's check if ride_id contains unique/null records.
+```{r}
+sum(is.na(finaldf$ride_id))
+sum(duplicated(finaldf$ride_id))
+```
+ We can see that there are 15 duplicate ride id's. Let's see those duplicate id's
+```{r}
+finaldf[duplicated(finaldf$ride_id),]
+```
+```{r}
+nrow(finaldf)
+```
+
+```{r}
+library(dplyr)
+```
+Removing duplicate records.
+```{r}
+finaldf<-finaldf[!(duplicated(finaldf$ride_id)|duplicated(finaldf$ride_id,fromLast=TRUE)),]
+```
+Counting the number of records in the dataset after removing duplicates to ensure duplicates were filtered out.
+```{r}
+nrow(finaldf)
+```
+```{r}
+sum(duplicated(finaldf$ride_id))
+```
+
+Extracting minutes from ride_length.  
+```{r}
+finaldf$min_ride_length<-minute(finaldf$ride_length)
+```
+We can see some rides not even lasting for 60 secs. Let's filter out records with ride length<60 seconds. They're most probably false timing or maybe the riders just trying to re-dock the bike.
+
+```{r}
+finaldf<-subset(finaldf,min_ride_length>=1)
+```
+
+```{r}
+head(finaldf)
+```
+## Analyzing Data
+```{r}
+max(finaldf$ride_length)
+min(finaldf$ride_length)
+median(finaldf$ride_length)
+```
+##Compare members and casual riders
+
+Members vs casual riders difference depending on total rides taken.
+```{r}
+rider<-finaldf%>%group_by(member_casual)%>%summarise(count=n())%>%mutate(percentage_of_users=(count/sum(count))*100)
+glimpse(rider)
+```
+
+```{r}
+ggplot(rider)+geom_col(mapping=aes(x=member_casual,y=percentage_of_users,fill=member_casual),show.legend = TRUE)+labs(title="Member Vs Casual")
+```
+
+We can see the Member Vs Casual distribution chart, it consists of 54.8% members and 45.2% casual riders . So it is evident that in the year 2021 members took ~10% more rides than casual riders.
+
+##Month wise distribution of users
+```{r}
+month<-finaldf%>%group_by(month,member_casual)%>%count()
+ggplot(data=month,aes(x=month,y=n,fill=member_casual))+geom_col(position="dodge")+labs(title="Users By Month",x="Month",y="Number of users")+scale_x_discrete(name="Month",limits=c("Jan","Feb","March","Apr","May","June","Jul","Aug","Sept","Oct","Nov","Dec"))+scale_y_continuous(labels=function(x) format(x,scientific=FALSE))
+```
+We can see from the chart above that members took more rides in all the months except June,July and August. 
+Casual riders maybe tourists who are visiting the place during the pleasant month. Hence, the sudden change in distribution.
+Most rides were taken during the month of July.
+-Also, it is to be noted that weather plays a significant role in the numbers of rides taken by users in a month.
+During the winter months, the number of rides taken significanthly reduces. This can be proved by taking the weather related information from a external database. And, according to the data provided, February was one of the coldest month in Chicago. Hence, the decrease in the number of rides.
+
+## Week wise distribution of users
+
+```{r}
+week<-finaldf%>%group_by(day_of_the_week,member_casual)%>%count()
+ggplot(data=week,aes(x=day_of_the_week,y=n,fill=member_casual))+geom_col(position="dodge")+labs(title="Users By Week Days",x="Week",y="Number of users")+scale_x_discrete(name="Week",limits=c("Sun","Mon","Tue","Wed","Thur","Fri","Sat"))+scale_y_continuous(labels=function(x) format(x,scientific=FALSE))
+```
+From the chart above, we can observe that most number of rides were taken on weekends.
+Casual riders took the highest number of rides on Saturday, whereas members took the highest rides on Wednesday.
+Members took almost consistent trips throughout the weekdays. Whereas, casual riders took the most rides in weekends, starting rise in Friday, followed by Saturday and Sunday.
+If customer details are provided, we could better target the casual riders using the cyclistic bikes during the weekdays, as some of them maybe using the bikes on a daily basis to commute to work/school.
+Casual riders using the bikes during the weekdays are our potential targets here.
+
+## Hour Wise distribution
+```{r}
+start_hour<-finaldf%>%group_by(start_hour_of_the_day,member_casual)%>%count()
+ggplot(data=start_hour,aes(x=start_hour_of_the_day,y=n,fill=member_casual))+geom_col(position="dodge")+labs(title=" Hourly Rush of Users",x="Hour",y="Number of users")+scale_x_discrete(name="Hour",limits=c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23))
+```
+We can see that there is bigger volume rise in the afternoon for both type of riders.
+The highest number of rides were taken at 5pm.
+There is increase in the number of rides taken by members in the morning(7AM-11AM).
+Casual riders take more rides in the midnight compared to members.
+Let's find out more by visualizing the usage of bikes throughout the week by hour of the day.
+
+```{r}
+ggplot(data=finaldf,aes(start_hour_of_the_day,fill=member_casual))+geom_bar()+labs(x="Hour_of_the_day",title="User distribution throughout the week by per hour")+facet_wrap(~day_of_the_week)
+```
+We can observe almost similar distribution of members throughout the week. There is big rise of volume in the weekdays from 7AM to 10 Am and another rise in number from 5pm to 7pm. We can theorize that members use the bikes daily(like going to work) from 7am-10am and coming back from work(5pm-7pm).
+There is completely different trend for members and casual riders during the weekends.
+There is huge peak in volume of casual riders from Friday to Sunday. From this we can speculate that casual riders mostly use bikes for some leisure activity in the weekends.
+
+## Average ride_length of users
+```{r}
+rlength<-finaldf%>%group_by(member_casual)%>%summarise(mean_time=mean(ride_length))
+ggplot(data=rlength,aes(x=member_casual,y=mean_time,fill=member_casual))+geom_col()+labs(title="Mean Time Member Vs Casual",x="User Type")
+```
+We can observe from the above chart that casual riders took the bike for longer rides compared to the members. This means that members use the bike to travel short distances like commuting to work etc.
+
+##Type of bike used
+```{r}
+ggplot(data=finaldf,aes(x=rideable_type,fill=member_casual))+geom_bar(position = "dodge")+labs(title="Type of Bike Used",x="Bike Type")
+```
+It can be observed that classic bike is the most preferred bike among both the users, followed by electric bike.
+Docked bike is the least preferred bike by members.
+
+## Distribution of users around different stations of Chicago
+```{r}
+install.packages("ggmap")
+library(ggmap)
+```
+```{r}
+chicago_bb<-c(left=-87.936287,bottom=41.679835,right=-87.447052,top=42.000835)
+chicago_stamen<-get_stamenmap(bbox=chicago_bb,zoom=10)
+ggmap(chicago_stamen)+geom_point(data=finaldf,mapping=aes(x=start_lng,y=start_lat,color=member_casual))
+```
+
+## Insights and final conclusion
+
+1. Weekends are the busiest time of the week, with more casual riders taking bike rides than members.
+2. Number of bikers in the afternoon is the highest.
+3. Weather plays a important role in the number of rides taken in a month, less rides taken during winter.
+4. On a whole,~10% more members use the cyclistic service than the casual riders.
+5. Fixed pattern can be found among the members during the weekdays, we can hypothesize that members use the bikes to commute to work.
+6. Classic bike is the most preferred bike among the riders, with docked bikes being the least preferred choice.
+7. Streeter Dr & Grand Ave is the station with the highest number of rides taken from.
+
+Now, let's answer the business question
+
+How does members differ from casual riders?
+
+1. The number of rides taken by casual riders are higher during the weekends, whereas the number of rides taken by the members are almost consistent throughout the weekdays.
+2. Members have bigger volume of data,except Saturday and Sunday. There is bigger proportion of casual riders during the weekends.
+3. The number of rides taken by members is higher during the morning 7am-10am, and there is more casual riders taking the ride during midnight.
+4. The average ride length of casual riders are higher than the members.
+5. Members seem to have a consistent routine throughout the week(daily routines),whereas casual riders are the most active during weekends(leisure activity).
+6. Members doesn't seem to ride the docked bikes in comparison to the casual riders.
+7. The number of casual riders during the month of June,July and August is higher than the members. This can be the tourists visiting the place during the pleasant months or it can be the reason of some school holidays leading to higher number of casual riders.
+8.The volume of casual riders are more concentrated near the city center i.e near to shoreline(this again indicates that casual riders are mostly visitors/tourists as these places are mostly sightseeing places), whereas the volume of members seem to be distributed all over the city(including city centre and outside of it) 
+
+##RECOMMENDATIONs
+
+1.Some coupons/discounts along with the annual membership should be provided during the high peak months and on weekends to target the casual riders. Such Ad campaigns should be marketed on tourism websites and also on platforms popular among youth like Instagram, Facebook so that University students near to the area can also be targeted.
+2.Cyclistic should partner with local transit companies so that the annual memberships can provide some discount while using buses,cabs around the city. This discount should especially be rolled out during the winter months with low bike rides taken. Such perks of the annual membership should be marketed properly among the casual riders.
+3. Points can be rewarded based on the ride duration(only for members), this will be profitable to the casual riders as their average ride time is higher than the members. The accumulated points can be rewarded in the form of some coupons of cafes,park around the area. Such scheme will encourage casual riders to take up the membership, also it will encourage riders to ride more. So it will be win-win situation.
+
+##Future Scope of Analysis
+
+1. The customer_id will be beneficial to better understand the behaviour of riders.
+2. Recurring customers can hence be noted and targeted properly.
+3. Pricing for casual riders, members and the type of bike used could provide better insights.
+4. The number of docks available in each station could be a valuable information, this could help us better understand the situation of each station.(Number of docks vs the rush in that station)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
