@@ -255,6 +255,8 @@ How does members differ from casual riders?
 3. Pricing for casual riders, members and the type of bike used could provide better insights.
 4. The number of docks available in each station could be a valuable information, this could help us better understand the situation of each station.(Number of docks vs the rush in that station)
 
+Check the dashboard created in Tableau : https://public.tableau.com/views/Cyclistic_16687245226700/Dashboard1?:language=en-US&:display_count=n&:origin=viz_share_link
+
 
 
 
